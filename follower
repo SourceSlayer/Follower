@@ -1,0 +1,125 @@
+#!/usr/bin/env python
+
+"""
+SpeakIt Source Code
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at http://mozilla.org/MPL/2.0/."""
+
+
+from PySide import QtCore, QtGui, QtWebKit
+import keyring
+import sys
+from yapsy.PluginManager import PluginManager
+import os
+
+cwd=os.getcwd()
+
+#class FollowerSettingsWindow
+
+class Follower:
+	def __init__(self, application):
+		self.application=application
+		self.settings=QtCore.QSettings()
+		self.error_message=QtGui.QErrorMessage()
+		self.plugin_manager=PluginManager()
+		self.plugin_manager.updatePluginPlaces([cwd+"/plugins"])
+		self.plugin_manager.collectPlugins()
+		self.desktop_services=QtGui.QDesktopServices()
+		self.tray_icon=QtGui.QSystemTrayIcon()
+		
+		self.window=QtGui.QMainWindow()
+		self.window.setWindowTitle("Follower")
+		
+		self.notebook=QtGui.QTabWidget()
+		self.notebook.setDocumentMode(True)
+		self.notebook.setMovable(True)
+		self.notebook.setTabsClosable(True)
+		self.window.setCentralWidget(self.notebook)
+		
+		self.dock=QtGui.QDockWidget("Select Dock")
+		self.content_view=QtGui.QTreeWidget()
+		self.dock.setWidget(self.content_view)
+		self.window.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dock)
+		l=QtGui.QTreeWidgetItem()
+		l.setText(0, "Potatoes and pans")
+		l.setText(1, "Cats")
+		self.content_view.addTopLevelItem(l)
+		
+		self.toolbar=self.window.addToolBar("Toolbar")
+		self.toolbar.addAction(QtGui.QIcon().fromTheme("media-seek-backward"), "Previous Article")
+		self.toolbar.addAction(QtGui.QIcon().fromTheme("media-seek-forward"), "Next Article")
+		self.toolbar.addSeparator()
+		self.toolbar.addAction(QtGui.QIcon().fromTheme("mail-message-new"), "Share")
+		self.toolbar.addSeparator()
+		toolbar_reload=self.toolbar.addAction(QtGui.QIcon().fromTheme("view-refresh"), "Refresh Article")
+		toolbar_reload.triggered.connect(lambda :self.notebook.currentWidget().reload())
+		toolbar_go_back=self.toolbar.addAction(QtGui.QIcon().fromTheme("go-previous"), "Back")
+		toolbar_go_back.triggered.connect(lambda :self.notebook.currentWidget().back())
+		toolbar_go_forward=self.toolbar.addAction(QtGui.QIcon().fromTheme("go-next"), "Next")
+		toolbar_go_forward.triggered.connect(lambda :self.notebook.currentWidget().forward())
+		
+		
+		self.menu_bar=self.window.menuBar()
+		file_menu=self.menu_bar.addMenu("File")
+		file_new_feed=file_menu.addAction("New Feed")
+		file_new_feed=file_menu.addAction("New Account")
+		file_menu.addSeparator()
+		file_preferences=file_menu.addAction("Preferences")
+		file_feeds=file_menu.addAction("Manage Feeds")
+		file_plugins=file_menu.addAction("Manage Plugins")
+		file_menu.addSeparator()
+		file_quit=file_menu.addAction("Close")
+		file_quit.setMenuRole(file_new_feed.QuitRole)
+		file_quit.triggered.connect(application.exit)
+		
+		view_menu=self.menu_bar.addMenu("View")
+		view_toolbar=view_menu.addAction("Main Toolbar")
+		view_toolbar.triggered.connect(lambda :self._toggle(self.toolbar))
+		view_dock=view_menu.addAction("Selector Dock")
+		view_dock.triggered.connect(lambda :self._toggle(self.dock))
+		
+		help_menu=self.menu_bar.addMenu("Help")
+		help_about=help_menu.addAction("About Follower")
+		help_about.setMenuRole(help_about.AboutRole)
+		help_about_qt=help_menu.addAction("About Qt Follower")
+		help_about_qt.setMenuRole(help_about.AboutQtRole)
+		help_about_qt.triggered.connect(application.aboutQt)
+		help_menu.addSeparator()
+		help_wiki=help_menu.addAction("Wiki")
+		help_wiki.triggered.connect(lambda: self.desktop_services.openUrl("http:www.github.com/SourceSlayer/Follower/wiki"))
+		
+		self.window.show()
+		
+		self.load_all_plugins()
+		
+	def load_all_plugins(self, name="All"):
+		failed=[]
+		for plugin in self.plugin_manager.getAllPlugins():
+			try:
+				plugin.plugin_object.main(self)
+			except AttributeError:
+				failed.append(plugin.name)
+			except TypeError:
+				failed.append(plugin.name)
+		self.error_message.showMessage("The following plugins have failed to load: "+", ".join(failed)+".\n <a href=\"http://www.github.com/\">Learn More<\\a>", "error")
+	
+	def _toggle(self, item, togglers=None):
+		if item.isVisible():
+			item.hide()
+		else:
+			item.show()
+	
+	
+
+def main():
+	app=QtGui.QApplication(sys.argv)
+	app.setOrganizationName("Slacking Source")
+	app.setOrganizationDomain("http://slackingsource.wordpress.com/software")
+	app.setApplicationName("Follower")
+	app.setApplicationVersion("0.1")
+	follower=Follower(app)
+	app.exec_()
+
+main() if __name__=="__main__" else 0
